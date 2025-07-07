@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-// import { MockV3Aggregator } from "../test/mocks/MockV3Aggregator.sol";
+import { MockV3Aggregator } from "../test/mocks/MockV3Aggregator.sol";
 import { Script } from "forge-std/Script.sol";
-// import { ERC20Mock } from "../test/mocks/ERC20Mock.sol";
+import { ERC20Mock } from "../test/mocks/ERC20Mock.sol";
 
 contract HelperConfig is Script {
     NetworkConfig public activeNetworkConfig;
@@ -23,10 +23,10 @@ contract HelperConfig is Script {
     uint256 public DEFAULT_ANVIL_PRIVATE_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
 
     constructor() {
-        if (block.chainid == 11_155_111) {
+        if (block.chainid == 11155111) {
             activeNetworkConfig = getSepoliaEthConfig();
         } else {
-            // activeNetworkConfig = getOrCreateAnvilEthConfig();
+            activeNetworkConfig = getOrCreateAnvilEthConfig();
         }
     }
 
@@ -40,26 +40,26 @@ contract HelperConfig is Script {
         });
     }
 
-    // function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory anvilNetworkConfig) {
-    //     // Check to see if we set an active network config
-    //     if (activeNetworkConfig.wethUsdPriceFeed != address(0)) {
-    //         return activeNetworkConfig;
-    //     }
+    function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory anvilNetworkConfig) {
+        // Check to see if we set an active network config
+        if (activeNetworkConfig.wethUsdPriceFeed != address(0)) {
+            return activeNetworkConfig;
+        }
 
-    //     vm.startBroadcast();
-    //     MockV3Aggregator ethUsdPriceFeed = new MockV3Aggregator(DECIMALS, ETH_USD_PRICE);
-    //     ERC20Mock wethMock = new ERC20Mock("WETH", "WETH", msg.sender, 1000e8);
+        vm.startBroadcast();
+        MockV3Aggregator ethUsdPriceFeed = new MockV3Aggregator(DECIMALS, ETH_USD_PRICE);
+        ERC20Mock wethMock = new ERC20Mock("WETH", "WETH", msg.sender, 1000e8);
 
-    //     MockV3Aggregator btcUsdPriceFeed = new MockV3Aggregator(DECIMALS, BTC_USD_PRICE);
-    //     ERC20Mock wbtcMock = new ERC20Mock("WBTC", "WBTC", msg.sender, 1000e8);
-    //     vm.stopBroadcast();
+        MockV3Aggregator btcUsdPriceFeed = new MockV3Aggregator(DECIMALS, BTC_USD_PRICE);
+        ERC20Mock wbtcMock = new ERC20Mock("WBTC", "WBTC", msg.sender, 1000e8);
+        vm.stopBroadcast();
 
-    //     anvilNetworkConfig = NetworkConfig({
-    //         wethUsdPriceFeed: address(ethUsdPriceFeed), // ETH / USD
-    //         wbtcUsdPriceFeed: address(btcUsdPriceFeed),
-    //         weth: address(wethMock),
-    //         wbtc: address(wbtcMock),
-    //         deployerKey: DEFAULT_ANVIL_PRIVATE_KEY
-    //     });
-    // }
+        anvilNetworkConfig = NetworkConfig({
+            wethUsdPriceFeed: address(ethUsdPriceFeed), // ETH / USD
+            wbtcUsdPriceFeed: address(btcUsdPriceFeed),
+            weth: address(wethMock),
+            wbtc: address(wbtcMock),
+            deployerKey: DEFAULT_ANVIL_PRIVATE_KEY
+        });
+    }
 }
