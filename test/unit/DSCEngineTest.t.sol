@@ -26,8 +26,9 @@ contract DSCEngineTest is StdCheats, Test {
     address public weth;
     address public wbtc;
     uint256 public deployerKey;
+    address public user = makeAddr("user");
 
-    address public user = address(1);
+    uint256 amountCollateral = 10 ether;
 
     uint256 public constant STARTING_USER_BALANCE = 10 ether;
 
@@ -39,6 +40,8 @@ contract DSCEngineTest is StdCheats, Test {
         if (block.chainid == 31337) {
             vm.deal(user, STARTING_USER_BALANCE);
         }
+        ERC20Mock(weth).mint(user, STARTING_USER_BALANCE);
+        ERC20Mock(wbtc).mint(user, STARTING_USER_BALANCE);
     }
 
     //////////////////
@@ -59,5 +62,14 @@ contract DSCEngineTest is StdCheats, Test {
         console.log("Expected USD Value:", expectedUsd);
         uint256 usdValue = dsce.getUsdValue(weth, ethAmount);
         assertEq(usdValue, expectedUsd);
+    }
+
+    function testRevertsIfCollateralZero() public {
+        vm.startPrank(user);
+        ERC20Mock(weth).approve(address(dsce), amountCollateral);
+
+        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
+        dsce.depositCollateral(weth, 0);
+        vm.stopPrank();
     }
 }

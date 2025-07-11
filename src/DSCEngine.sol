@@ -74,7 +74,7 @@ contract DSCEngine is ReentrancyGuard {
      * @param amount The amount of collateral being deposited
      */
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
-    // event CollateralRedeemed(address indexed redeemFrom, address indexed redeemTo, address token, uint256 amount); // if redeemFrom != redeemedTo, then it was liquidated
+    event CollateralRedeemed(address indexed redeemFrom, address indexed redeemTo, address token, uint256 amount); // if redeemFrom != redeemedTo, then it was liquidated
 
     ///////////////////
     // Modifiers
@@ -108,16 +108,34 @@ contract DSCEngine is ReentrancyGuard {
         }
         i_dsc = DecentralizedStableCoin(dscAddress);
     }
-    // function depositCollateralAndMintDsc(
-    //     address tokenCollateralAddress,
-    //     uint256 amountCollateral,
-    //     uint256 amountDscToMint
-    // )
-    //     external
-    // {
-    //     depositCollateral(tokenCollateralAddress, amountCollateral);
-    //     mintDsc(amountDscToMint);
-    // }
+
+    function _redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        address from,
+        address to
+    )
+        private
+    {
+        s_collateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemed(from, to, tokenCollateralAddress, amountCollateral);
+        bool success = IERC20(tokenCollateralAddress).transfer(to, amountCollateral);
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+    }
+
+
+    function depositCollateralAndMintDsc(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDscToMint
+    )
+        external
+    {
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        mintDsc(amountDscToMint);
+    }
 
     /*
      * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
@@ -141,32 +159,32 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    // function redeemCollateralForDsc(
-    //     address tokenCollateralAddress,
-    //     uint256 amountCollateral,
-    //     uint256 amountDscToBurn
-    // )
-    //     external
-    //     moreThanZero(amountCollateral)
-    //     isAllowedToken(tokenCollateralAddress)
-    // {
-    //     _burnDsc(amountDscToBurn, msg.sender, msg.sender);
-    //     _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
-    //     _revertIfHealthFactorIsBroken(msg.sender);
-    // }
+    function redeemCollateralForDsc(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDscToBurn
+    )
+        external
+        moreThanZero(amountCollateral)
+        isAllowedToken(tokenCollateralAddress)
+    {
+        _burnDsc(amountDscToBurn, msg.sender, msg.sender);
+        _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
-    // function redeemCollateral(
-    //     address tokenCollateralAddress,
-    //     uint256 amountCollateral
-    // )
-    //     external
-    //     moreThanZero(amountCollateral)
-    //     nonReentrant
-    //     isAllowedToken(tokenCollateralAddress)
-    // {
-    //     _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
-    //     _revertIfHealthFactorIsBroken(msg.sender);
-    // }
+    function redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral
+    )
+        external
+        moreThanZero(amountCollateral)
+        nonReentrant
+        isAllowedToken(tokenCollateralAddress)
+    {
+        _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
 
     ///////////////////
     // Public Functions
@@ -183,6 +201,17 @@ contract DSCEngine is ReentrancyGuard {
         if (minted != true) {
             revert DSCEngine__MintFailed();
         }
+    }
+
+    function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) public {
+        s_DSCMinted[onBehalfOf] -= amountDscToBurn;
+
+        bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
+        // This conditional is hypothetically unreachable
+        if (!success) {
+            revert DSCEngine__TransferFailed();
+        }
+        i_dsc.burn(amountDscToBurn);
     }
 
     //////////////////////////////
@@ -240,15 +269,12 @@ contract DSCEngine is ReentrancyGuard {
         // We want to have everything in terms of WEI, so we add 10 zeros at the end
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
     }
-
-    // function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) private {
-    //     s_DSCMinted[onBehalfOf] -= amountDscToBurn;
-
-    //     bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
-    //     // This conditional is hypothetically unreachable
-    //     if (!success) {
-    //         revert DSCEngine__TransferFailed();
-    //     }
-    //     i_dsc.burn(amountDscToBurn);
-    // }
 }
+
+
+/**
+ * This is the formula used to determine the minimum over-collateralization ratio required for a user's position to be considered safe (Health Factor >= 1)
+ * collateral_value   ×  (LIQUIDATION_THRESHOLD / LIQUIDATION_PRECISION)
+--------------------------------------------------------------  ≥ 1
+                          debt_value
+ */
