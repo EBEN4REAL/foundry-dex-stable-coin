@@ -171,6 +171,36 @@ contract DSCEngine is ReentrancyGuard {
     anyone.
      * For example, if the price of the collateral plummeted before anyone could be liquidated.
     */
+    // function liquidate(address collateral, address user, uint256 debtToCover)
+    //     external
+    //     isAllowedToken(collateral)
+    //     moreThanZero(debtToCover)
+    //     nonReentrant
+    // {
+    //     uint256 startingUserHealthFactor = _healthFactor(user);
+    //     if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
+    //         revert DSCEngine__HealthFactorOk();
+    //     }
+    //     // If covering 100 DSC, we need to $100 of collateral
+    //     uint256 tokenAmountFromDebtCovered = getTokenAmountFromUsd(collateral, debtToCover);
+    //     // And give them a 10% bonus
+    //     // So we are giving the liquidator $110 of WETH for 100 DSC
+    //     // We should implement a feature to liquidate in the event the protocol is insolvent
+    //     // And sweep extra amounts into a treasury
+    //     uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
+    //     // Burn DSC equal to debtToCover
+    //     // Figure out how much collateral to recover based on how much burnt
+    //     _burnDsc(debtToCover, user, msg.sender);
+    //     _redeemCollateral(collateral, tokenAmountFromDebtCovered + bonusCollateral, user, msg.sender);
+
+    //     uint256 endingUserHealthFactor = _healthFactor(user);
+    //     // This conditional should never hit, but just in case
+    //     if (endingUserHealthFactor <= startingUserHealthFactor) {
+    //         revert DSCEngine__HealthFactorNotImproved();
+    //     }
+    //     _revertIfHealthFactorIsBroken(msg.sender);
+    // }
+
     function liquidate(address collateral, address user, uint256 debtToCover)
         external
         isAllowedToken(collateral)
@@ -181,23 +211,31 @@ contract DSCEngine is ReentrancyGuard {
         if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
             revert DSCEngine__HealthFactorOk();
         }
-        // If covering 100 DSC, we need to $100 of collateral
+
+        // Get equivalent collateral value for the DSC debt
         uint256 tokenAmountFromDebtCovered = getTokenAmountFromUsd(collateral, debtToCover);
-        // And give them a 10% bonus
-        // So we are giving the liquidator $110 of WETH for 100 DSC
-        // We should implement a feature to liquidate in the event the protocol is insolvent
-        // And sweep extra amounts into a treasury
         uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
-        // Burn DSC equal to debtToCover
-        // Figure out how much collateral to recover based on how much burnt
-        _redeemCollateral(collateral, tokenAmountFromDebtCovered + bonusCollateral, user, msg.sender);
+        uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
+
+        // Cap redemption to the user's actual collateral balance
+        uint256 userCollateralBalance = s_collateralDeposited[user][collateral];
+        if (totalCollateralToRedeem > userCollateralBalance) {
+            totalCollateralToRedeem = userCollateralBalance;
+        }
+
+        // Step 1: Burn the liquidator's DSC to pay user's debt
         _burnDsc(debtToCover, user, msg.sender);
 
+        // Step 2: Transfer collateral from user to liquidator
+        _redeemCollateral(collateral, totalCollateralToRedeem, user, msg.sender);
+
+        // Step 3: Validate that user's health factor improved
         uint256 endingUserHealthFactor = _healthFactor(user);
-        // This conditional should never hit, but just in case
         if (endingUserHealthFactor <= startingUserHealthFactor) {
             revert DSCEngine__HealthFactorNotImproved();
         }
+
+        // Step 4: Ensure the liquidator’s health factor is still intact
         _revertIfHealthFactorIsBroken(msg.sender);
     }
 
@@ -312,6 +350,10 @@ contract DSCEngine is ReentrancyGuard {
         // The returned value from Chainlink will be 2000 * 1e8
         // Most USD pairs have 8 decimals, so we will just pretend they all do
         return ((usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
+    }
+
+    function getHealthFactor(address user) external view returns (uint256) {
+        return _healthFactor(user);
     }
 
     function getAccountInformation(address user)
