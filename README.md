@@ -71,7 +71,7 @@ A minimal, crypto-backed, overcollateralized **stablecoin protocol**, inspired b
 
 ### 📣 Why This Project Matters
 
-This smart contract system teaches fundamental DeFi concepts such as:
+This smart contract system demonstrates fundamental DeFi concepts such as:
 
 * Price-oracle driven collateralization (Chainlink feeds)
 * Minting/burning ERC20 stablecoins
