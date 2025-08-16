@@ -1,66 +1,79 @@
-## Foundry
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## 🏦 DecentralizedStableCoin (DSC) System
 
-Foundry consists of:
+A minimal, crypto-backed, overcollateralized **stablecoin protocol**, inspired by MakerDAO — but simplified with:
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+* **No governance**
+* **No stability fees**
+* Backed solely by **ETH/WBTC-like collateral**
 
-## Documentation
+---
 
-https://book.getfoundry.sh/
+### 🔑 Main Contracts
 
-## Usage
+| Contract                  | Purpose                                                |
+| ------------------------- | ------------------------------------------------------ |
+| `DecentralizedStableCoin` | ERC20 stablecoin token (DSC), pegged to \$1            |
+| `DSCEngine`               | Core protocol logic (minting, collateral, liquidation) |
 
-### Build
+---
 
-```shell
-$ forge build
+### ⚙️ How the System Works
+
+```txt
++---------------------+
+|  User deposits ETH   |
++-----------+---------+
+            |
+            v
++---------------------+    <-- Chainlink price feeds determine USD value
+| Collateral stored    |
+| in DSCEngine         |
++-----------+---------+
+            |
+            v
++---------------------+
+|  User mints DSC     |   <-- Only allowed if collateral value ≥ 2× DSC minted
++-----------+---------+
+            |
+            v
++---------------------+
+| Health Factor check |
++-----------+---------+
+            |
+   if < 1.0  |  if ≥1.0
+  ---------- | ----------
+ |LIQUIDATE  | SAFE POSITION
+  ---------- | ----------
 ```
 
-### Test
+---
 
-```shell
-$ forge test
-```
+### 📌 Core Design Principles
 
-### Format
+* ✅ **Exogenous collateral** (crypto)
+* ✅ **Overcollateralized (≥200%)**
+* ✅ **USD-pegged**
+* 🔁 **Algorithmic stability (health factor)**
+* ❌ No governance token
+* ❌ No borrower interest / stability fee
 
-```shell
-$ forge fmt
-```
+---
 
-### Gas Snapshots
+### 🚨 Liquidation Mechanism
 
-```shell
-$ forge snapshot
-```
+* If a user’s **health factor < 1**, anyone can **liquidate** them:
 
-### Anvil
+  * Pay off their DSC debt
+  * Receive their collateral **at a 10% discount**
 
-```shell
-$ anvil
-```
+---
 
-### Deploy
+### 📣 Why This Project Matters
 
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
+This smart contract system teaches fundamental DeFi concepts such as:
 
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+* Price-oracle driven collateralization (Chainlink feeds)
+* Minting/burning ERC20 stablecoins
+* Health factors & overcollateralization logic
+* Liquidation incentives and mechanisms
